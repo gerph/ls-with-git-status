@@ -165,11 +165,11 @@ for spec in "${ls_dirs[@]}" ; do
                 state_y="${state:1:2}"
                 case "$state" in
                     'DD') label="${color_unmerged}unmerged{$color_reset}, ${color_changed}both deleted${color_reset}" ; ;;
-                    'AU') label="${color_unmerged}unmerged{$color_reset}, ${color_added}added by us${color_reset}" ; ;;
+                    'AU') label="${color_unmerged}unmerged{$color_reset}, ${color_changed}added by us${color_reset}" ; ;;
                     'UD') label="${color_unmerged}unmerged{$color_reset}, ${color_changed}deleted by them${color_reset}" ; ;;
-                    'UA') label="${color_unmerged}unmerged{$color_reset}, ${color_added}added by them${color_reset}" ; ;;
+                    'UA') label="${color_unmerged}unmerged{$color_reset}, ${color_changed}added by them${color_reset}" ; ;;
                     'DU') label="${color_unmerged}unmerged{$color_reset}, ${color_changed}deleted by us${color_reset}" ; ;;
-                    'AA') label="${color_unmerged}unmerged{$color_reset}, ${color_added}both added${color_reset}" ; ;;
+                    'AA') label="${color_unmerged}unmerged{$color_reset}, ${color_changed}both added${color_reset}" ; ;;
                     'UU') label="${color_unmerged}unmerged{$color_reset}, ${color_changed}both modified${color_reset}" ; ;;
                     '??') label="${color_untracked}untracked${color_reset}" ; ;;
                     '!!') label="${color_ignored}ignored${color_reset}" ; ;;
