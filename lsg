@@ -1,0 +1,215 @@
+#!/bin/bash
+##
+# List files, including git information in the output.
+# We accept switches for ls and attempt to mimic the usual behaviour of the tool.
+#
+
+ls_switches=()
+while [[ "${1:0:1}" == '-' && "$1" != '--' ]] ; do
+    # Another parameter for ls_switches
+    ls_switches+=("$1")
+    shift
+done
+
+# Include colouring
+if [[ "$(uname -s)" == 'Darwin' ]] ; then
+    export CLICOLOR_FORCE=1
+    ls_switches+=('-G')
+else
+    ls_switches+=('--color=always')
+fi
+
+if [[ "$1" == '--' ]] ; then
+    ls_switches+=('--')
+    shift
+fi
+
+ls_dirs=("$@")
+if [[ "${#ls_dirs[@]}" == 0 ]] ; then
+    ls_dirs=('.')
+fi
+
+
+# Pick colours from the git configuration to match user preference
+color_branch="$(git config --get-color color.status.branch 'cyan')"
+color_added="$(git config --get-color color.status.added 'green')"
+color_updated="$(git config --get-color color.status.updated 'green')"
+color_changed="$(git config --get-color color.status.changed 'yellow')"
+color_untracked="$(git config --get-color color.status.untracked 'red')"
+color_unmerged="$(git config --get-color color.status.unmerged 'red bold')"
+# I don't think ignored is a real status colour, and it actually comes out in red
+# when you use `git status --ignored`, however, white makes more sense to me,
+# as we don't care about those files.
+color_ignored="$(git config --get-color color.status.ignored 'white')"
+color_reset="$(git config --get-color '' 'reset')"
+color_bold="$(git config --get-color '' 'bold')"
+
+
+# Configuration here matches my shell prompt
+prompt_git_delta=$'\033[1;34m'
+prompt_git_reset=$'\033[0m'
+
+# Symbols to use in the prompt, based on what looks reasonable in the terminal
+# (although we could be remote, it's less common, so we try to match local system type)
+if [[ "$(uname -s)" == 'Darwin' ]] ; then
+    prompt_git_ahead_symbol="↑"
+    prompt_git_behind_symbol="↓"
+else
+    prompt_git_ahead_symbol="￪"
+    prompt_git_behind_symbol="￬"
+fi
+
+
+function git_relative_state() {
+    local dir="$1"
+    local upstream
+    local upstreamrefname
+    local behind
+    local ahead
+    local delta
+
+    cd $1
+
+    # Check if we have an upstream configured
+    upstream="$(git for-each-ref --format='%(upstream:short)' "$(git symbolic-ref -q HEAD)")"
+    upstreamrefname='upstream'
+    if [[ "$upstream" == '' ]] ; then
+        upstream="$(git for-each-ref --format='%(push:short)' "$(git symbolic-ref -q HEAD)")"
+        upstreamrefname='push'
+    fi
+    if [[ "$upstream" != '' ]] ; then
+        behind="$(git rev-list --count "@..@{${upstreamrefname}}" 2>/dev/null)"
+        ahead="$(git rev-list --count "@{${upstreamrefname}}..@" 2>/dev/null)"
+        if [[ "${ahead}${behind}" != '' ]] ; then
+            if [[ "${behind}" != '0' ]] ; then
+                behind="$prompt_git_behind_symbol$behind"
+            else
+                behind=''
+            fi
+            if [[ "${ahead}" != '0' ]] ; then
+                ahead="$prompt_git_ahead_symbol$ahead"
+            else
+                ahead=''
+            fi
+        fi
+    fi
+
+    if [[ "${ahead}${behind}" != '' ]] ; then
+        delta="$prompt_git_delta$ahead$behind$prompt_git_reset"
+    fi
+    echo "$delta"
+}
+
+
+# I'm going to entirely ignore the problems of filenames with spaces in.
+first=true
+for spec in "${ls_dirs[@]}" ; do
+    if [[ "${#ls_dirs[@]}" -gt 1 ]] ; then
+        # Mimic the ls behaviour of writing out the directory name when listing multiple dirs
+        if ! $first ; then
+            echo
+        fi
+        first=false
+        echo "${color_bold}$spec${color_reset}:"
+    fi
+    if [[ -e "$spec" ]] ; then
+        in_git="$(cd "$spec" && git rev-parse --is-inside-work-tree 2> /dev/null)"
+    else
+        in_git=false
+    fi
+
+    longest_line="$(ls "${ls_switches[@]}" "$spec" 2> /dev/null \
+                        | sed $'s/\x1B\\[[0-9;]*[a-zA-Z]//g' \
+                        | expand \
+                        | awk '{ if ( length > x ) { x = length } } END{ print x }')"
+
+    ls "${ls_switches[@]}" "$spec" \
+        | while read line ; do
+            label=''
+            name=''
+            line_without_colouring="$(echo "$line" | sed $'s/\x1B\\[[0-9;]*[a-zA-Z]//g')"
+            line_length="${#line_without_colouring}"
+
+            if [[ "$line_without_colouring" == '' ]] ; then
+                echo
+                continue
+            fi
+
+            # If -R was specified then we'll have come lines that are formed as
+            # <directory>:
+            # which indicates a new directory has been entered... so we need to
+            # take account of this.
+            if [[ "$line_without_colouring" =~ ^(.*):$ ]] ; then
+                spec="${BASH_REMATCH[1]}"
+                echo "${color_bold}$spec${color_reset}:"
+                continue
+            fi
+
+            if [[ "$line_without_colouring" =~ \ ([^\ ]+)$ || \
+                  "$line_without_colouring" =~ ^([^\ ]+)$ ]] ; then
+                name="${BASH_REMATCH[1]}"
+            fi
+
+            if [[ -d "$spec/$name/.git" || -f "$spec/$name/.git" ]] ; then
+                # That object is a directory, and is a git repository.
+                branch="$(git --git-dir="$spec/$name/.git" name-rev --name-only HEAD 2> /dev/null)"
+                delta="$(git_relative_state "$spec/$name")"
+                label="(${color_branch}${branch}${delta}${color_reset})"
+
+            elif [[ $in_git && -f "$spec/$name" ]] ; then
+                # On files, check if the file is up to date or not
+                state="$(cd "$spec" ; git status --porcelain --ignored "$name" 2> /dev/null)"
+                state="${state:-  }"
+                state="${state:0:2}"
+                state_x="${state:0:1}"
+                state_y="${state:1:2}"
+                case "$state" in
+                    'DD') label="${color_unmerged}unmerged{$color_reset}, ${color_changed}both deleted${color_reset}" ; ;;
+                    'AU') label="${color_unmerged}unmerged{$color_reset}, ${color_added}added by us${color_reset}" ; ;;
+                    'UD') label="${color_unmerged}unmerged{$color_reset}, ${color_changed}deleted by them${color_reset}" ; ;;
+                    'UA') label="${color_unmerged}unmerged{$color_reset}, ${color_added}added by them${color_reset}" ; ;;
+                    'DU') label="${color_unmerged}unmerged{$color_reset}, ${color_changed}deleted by us${color_reset}" ; ;;
+                    'AA') label="${color_unmerged}unmerged{$color_reset}, ${color_added}both added${color_reset}" ; ;;
+                    'UU') label="${color_unmerged}unmerged{$color_reset}, ${color_changed}both modified${color_reset}" ; ;;
+                    '??') label="${color_untracked}untracked${color_reset}" ; ;;
+                    '!!') label="${color_ignored}ignored${color_reset}" ; ;;
+                    *)
+                        in_index=''
+                        in_tree=''
+                        case "$state_x" in
+                            ' ') : ;; # No change to index
+                            'M') in_index="${color_updated}updated" ; ;;
+                            'A') in_index="${color_added}added" ; ;;
+                            'D') in_index="${color_updated}deleted" ; ;;
+                            'R') in_index="${color_updated}renamed" ; ;;
+                            'C') in_index="${color_added}copied" ; ;;
+                            *) in_tree="?$state_x?"
+                        esac
+                        in_index="${in_index:+$in_index$color_reset}"
+                        case "$state_y" in
+                            ' ') : ;; # No change to worktree
+                            'M') in_tree="${color_changed}modified locally" ; ;;
+                            'A') in_tree="${color_changed}added locally" ; ;;
+                            'D') in_tree="${color_changed}deleted locally" ; ;;
+                            *) in_tree="?$state_y?"
+                        esac
+                        in_tree="${in_tree:+$in_tree$color_reset}"
+                        if [[ "$in_index" != '' && "$in_tree" != '' ]] ; then
+                            label="$in_index+$in_tree"
+                        else
+                            label="$in_index$in_tree"
+                        fi
+                        ;;
+                esac
+
+                if [[ "$label" != "" ]] ; then
+                    label="{$label}"
+                fi
+            fi
+            if [[ "$label" != '' ]] ; then
+                printf "%s  %*s%s\n" "$line" $((longest_line - line_length)) "" "$label"
+            else
+                echo "$line"
+            fi
+          done
+done
