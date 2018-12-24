@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ##
 # List files, including git information in the output.
 # We accept switches for ls and attempt to mimic the usual behaviour of the tool.
@@ -40,7 +40,7 @@ color_unmerged="$(git config --get-color color.status.unmerged 'red bold')"
 # I don't think ignored is a real status colour, and it actually comes out in red
 # when you use `git status --ignored`, however, white makes more sense to me,
 # as we don't care about those files.
-color_ignored="$(git config --get-color color.status.ignored 'white')"
+color_ignored="$(git config --get-color color.status.ignored 'dim')"
 color_reset="$(git config --get-color '' 'reset')"
 color_bold="$(git config --get-color '' 'bold')"
 
@@ -101,6 +101,12 @@ function git_relative_state() {
 }
 
 
+has_associative_arrays=false
+if [[ "${BASH_VERSION%%.*}" -ge 4 ]] ; then
+    has_associative_arrays=true
+fi
+
+
 # I'm going to entirely ignore the problems of filenames with spaces in.
 first=true
 for spec in "${ls_dirs[@]}" ; do
@@ -122,6 +128,22 @@ for spec in "${ls_dirs[@]}" ; do
                         | sed $'s/\x1B\\[[0-9;]*[a-zA-Z]//g' \
                         | expand \
                         | awk '{ if ( length > x ) { x = length } } END{ print x }')"
+
+    if $in_git && $has_associative_arrays ; then
+        # If we have associative arrays, we can make this faster by
+        # listing the git status of all the files.
+        declare -A git_status
+        if [[ -d "$spec" ]] ; then
+            cd "$spec"
+            while IFS= read -r line ; do
+                name="${line:3:${#line}}"
+                git_status[$name]="$line"
+            done < <(git status --porcelain --ignored 2> /dev/null)
+            cd - > /dev/null
+        fi
+    else
+        git_status=()
+    fi
 
     ls "${ls_switches[@]}" "$spec" \
         | while read line ; do
@@ -157,9 +179,13 @@ for spec in "${ls_dirs[@]}" ; do
                 delta="$(git_relative_state "$spec/$name")"
                 label="(${color_branch}${branch}${delta}${color_reset})"
 
-            elif [[ $in_git && -f "$spec/$name" ]] ; then
+            elif $in_git && [[ -f "$spec/$name" ]] ; then
                 # On files, check if the file is up to date or not
-                state="$(cd "$spec" ; git status --porcelain --ignored "$name" 2> /dev/null)"
+                if $has_associative_arrays ; then
+                    state="${git_status[$name]}"
+                else
+                    state="$(cd "$spec" ; git status --porcelain --ignored "$name" 2> /dev/null)"
+                fi
                 state="${state:-  }"
                 state="${state:0:2}"
                 state_x="${state:0:1}"
@@ -179,7 +205,7 @@ for spec in "${ls_dirs[@]}" ; do
                         in_tree=''
                         case "$state_x" in
                             ' ') : ;; # No change to index
-                            'M') in_index="${color_updated}updated" ; ;;
+                            'M') in_index="${color_updated}staged" ; ;;
                             'A') in_index="${color_added}added" ; ;;
                             'D') in_index="${color_updated}deleted" ; ;;
                             'R') in_index="${color_updated}renamed" ; ;;
