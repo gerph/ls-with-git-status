@@ -215,7 +215,18 @@ for spec in "${ls_dirs[@]}" ; do
                         in_index="${in_index:+$in_index$color_reset}"
                         case "$state_y" in
                             ' ') : ;; # No change to worktree
-                            'M') in_tree="${color_changed}modified locally" ; ;;
+                            'M') in_tree="${color_changed}modified locally"
+                                diff_line="$(git diff --numstat "$spec/$name" | expand)"
+                                if [[ "$diff_line" =~ ^([0-9]+)\ +([0-9]+) ]] ; then
+                                    added_lines="${BASH_REMATCH[1]}"
+                                    deleted_lines="${BASH_REMATCH[1]}"
+                                    total_lines="$(( added_lines + deleted_lines ))"
+                                    in_tree="${in_tree}, ${total_lines} line"
+                                    if [[ "${total_lines}" != 1 ]] ; then
+                                        in_tree="${in_tree}s"
+                                    fi
+                                fi
+                                ;;
                             'A') in_tree="${color_changed}added locally" ; ;;
                             'D') in_tree="${color_changed}deleted locally" ; ;;
                             *) in_tree="?$state_y?"
