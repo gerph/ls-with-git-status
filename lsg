@@ -6,7 +6,7 @@
 
 # The command we'll actually run for listing.
 # Replacing this with 'gls' on MacOS with GNU coreutils will run the gnu version instead.
-ls=ls
+ls='ls'
 
 ls_switches=()
 warned=false
@@ -139,7 +139,7 @@ function git_relative_state() {
     local ahead
     local delta
 
-    cd "$dir"
+    cd "$dir" || return
 
     # Check if we have an upstream configured
     upstream="$(git for-each-ref --format='%(upstream:short)' "$(git symbolic-ref -q HEAD)")"
@@ -189,7 +189,7 @@ function git_line_changes() {
         arg=""
     fi
 
-    diff_line="$(cd "$dir" ; git diff $arg --summary --numstat "$name" | expand)"
+    diff_line="$(cd "$dir" && git diff $arg --summary --numstat "$name" | expand)"
     if [[ "$diff_line" =~ ^([0-9]+)\ +([0-9]+) ]] ; then
         added_lines="${BASH_REMATCH[1]}"
         deleted_lines="${BASH_REMATCH[2]}"
@@ -239,7 +239,7 @@ function git_status_for_file() {
     if $has_associative_arrays ; then
         state="${git_status[$name]}"
     else
-        state="$(cd "$dir" ; git status --porcelain --ignored "$name" 2> /dev/null \
+        state="$(cd "$dir" && git status --porcelain --ignored "$name" 2> /dev/null \
                     | grep "^.. $gitsubdir" \
                     | sed "s/ ${gitsubdir//\//\\/}/ /; /\//d")"
     fi
@@ -283,8 +283,8 @@ for spec in "${ls_dirs[@]}" ; do
         # off the prefix directory from those lines so that they
         # match the leaf names that we are enumerating from the
         # `ls` command.
-        fulldir="$(cd "$specdir" ; pwd -P)"
-        gitbase="$(cd "$specdir" ; git rev-parse --show-toplevel)"
+        fulldir="$(cd "$specdir" && pwd -P)"
+        gitbase="$(cd "$specdir" && git rev-parse --show-toplevel)"
         gitsubdir="${fulldir:${#gitbase}+1}"
         gitsubdir="$gitsubdir${gitsubdir:+/}"
     fi
@@ -298,7 +298,7 @@ for spec in "${ls_dirs[@]}" ; do
                 name="${line:3:${#line}}"
                 name="${name%/}"
                 git_status[$name]="$line"
-            done < <(cd "$specdir" ; \
+            done < <(cd "$specdir" && \
                         git status --porcelain --ignored . 2> /dev/null \
                         | grep "^.. $gitsubdir" \
                         | sed "s/ ${gitsubdir//\//\\/}/ /; /\//d")
@@ -312,6 +312,8 @@ for spec in "${ls_dirs[@]}" ; do
             label=''
             name=''
             suffix=''
+            # shellcheck disable=SC2001
+            # It is not possible to use a shell replacement for this sed.
             line_without_colouring="$(echo "$line" | sed $'s/\x1B\\[[0-9;]*[a-zA-Z]//g')"
             line_length="${#line_without_colouring}"
 
@@ -330,6 +332,8 @@ for spec in "${ls_dirs[@]}" ; do
                 continue
             fi
 
+            # shellcheck disable=SC2034
+            # Ignore the suffix variable unused
             if $is_quoted ; then
                 # For the quoted filenames, the symlink target isn't needed, so we don't
                 # need to do checks for it, or anchor to the end of the line.
