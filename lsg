@@ -9,11 +9,31 @@
 ls=ls
 
 ls_switches=()
+warned=false
+# Track the switches we pass to ls in ls_switches
 while [[ "${1:0:1}" == '-' && "$1" != '--' ]] ; do
-    # Another parameter for ls_switches
-    ls_switches+=("$1")
+    switch="$1"
+    # Certain switches are not supported and must be ignored.
+    if [[ "$switch" =~ ^-[^-] ]] ; then
+        # Single '-' switch
+        while [[ "$switch" =~ ^(.*)([Cx])(.*)$ ]] ; do
+            # Multi column format was requested.
+            # That's not possible for us, so we trim it out.
+            switch="${BASH_REMATCH[1]}${BASH_REMATCH[3]}"
+            echo "Warning: Ignoring switch -${BASH_REMATCH[2]}" >&2
+            warned=true
+        done
+    fi
+    if [[ "$switch" != '-' ]] ; then
+        ls_switches+=("$switch")
+    fi
     shift
 done
+
+if $warned ; then
+    # A blank line to separate our warnings from the main output
+    echo >&2
+fi
 
 # Include colouring
 if [[ "$(uname -s)" == 'Darwin' && "$ls" == 'ls' ]] ; then
