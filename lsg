@@ -175,8 +175,9 @@ function git_relative_state() {
 ##
 # Print a description of the line changes for a given file (in the cache or in the working tree).
 function git_line_changes() {
-    local file="$1"
-    local where="$2"
+    local dir="$1"
+    local file="$2"
+    local where="$3"
     local arg=''
     local result=''
     local diff_line added_lines deleted_lines total_lines
@@ -188,7 +189,7 @@ function git_line_changes() {
         arg=""
     fi
 
-    diff_line="$(git diff $arg --summary --numstat "$spec/$name" | expand)"
+    diff_line="$(cd "$dir" ; git diff $arg --summary --numstat "$name" | expand)"
     if [[ "$diff_line" =~ ^([0-9]+)\ +([0-9]+) ]] ; then
         added_lines="${BASH_REMATCH[1]}"
         deleted_lines="${BASH_REMATCH[2]}"
@@ -221,8 +222,13 @@ for spec in "${ls_dirs[@]}" ; do
         first=false
         echo "${color_bold}$spec${color_reset}:"
     fi
+
+    specdir="$spec"
+    if [[ -f "$spec" ]] ; then
+        specdir="$(dirname "$spec")"
+    fi
     if [[ -e "$spec" ]] ; then
-        in_git="$(cd "$spec" && git rev-parse --is-inside-work-tree 2> /dev/null)"
+        in_git="$(cd "$specdir" && git rev-parse --is-inside-work-tree 2> /dev/null)"
     else
         in_git=false
     fi
@@ -232,16 +238,33 @@ for spec in "${ls_dirs[@]}" ; do
                         | expand \
                         | awk '{ if ( length > x ) { x = length } } END{ print x }')"
 
+    if $in_git ; then
+        # `git status` will only produce statuses relative to the
+        # top level of the repository. Consequently, we need to
+        # only select the files in the status line that are in
+        # the directory we are looking at, and we need to trim
+        # off the prefix directory from those lines so that they
+        # match the leaf names that we are enumerating from the
+        # `ls` command.
+        fulldir="$(cd "$specdir" ; pwd -P)"
+        gitbase="$(cd "$specdir" ; git rev-parse --show-toplevel)"
+        gitsubdir="${fulldir:${#gitbase}+1}"
+        gitsubdir="$gitsubdir${gitsubdir:+/}"
+    fi
+
     if $in_git && $has_associative_arrays ; then
         # If we have associative arrays, we can make this faster by
         # listing the git status of all the files.
         declare -A git_status
-        if [[ -d "$spec" ]] ; then
-            cd "$spec"
+        if [[ -d "$specdir" ]] ; then
+            cd "$specdir"
             while IFS= read -r line ; do
                 name="${line:3:${#line}}"
+                name="${name%/}"
                 git_status[$name]="$line"
-            done < <(git status --porcelain --ignored 2> /dev/null)
+            done < <(git status --porcelain --ignored . 2> /dev/null \
+                        | grep "^.. $gitsubdir" \
+                        | sed "s/ ${gitsubdir//\//\\/}/ /; /\//d")
             cd - > /dev/null
         fi
     else
@@ -317,12 +340,12 @@ for spec in "${ls_dirs[@]}" ; do
                 delta="$(git_relative_state "$spec/$name")"
                 label="(${color_branch}${branch}${delta}${color_reset})"
 
-            elif $in_git && [[ -f "$spec/$name" ]] ; then
+            elif $in_git && [[ -f "$specdir/$name" ]] ; then
                 # On files, check if the file is up to date or not
                 if $has_associative_arrays ; then
                     state="${git_status[$name]}"
                 else
-                    state="$(cd "$spec" ; git status --porcelain --ignored "$name" 2> /dev/null)"
+                    state="$(cd "$specdir" ; git status --porcelain --ignored "$name" 2> /dev/null)"
                 fi
                 state="${state:-  }"
                 state="${state:0:2}"
@@ -344,7 +367,7 @@ for spec in "${ls_dirs[@]}" ; do
                         case "$state_x" in
                             ' ') : ;; # No change to index
                             'M') in_index="${color_updated}staged"
-                                changes="$(git_line_changes "$spec/$name" tree)"
+                                changes="$(git_line_changes "$specdir" "$name" cache)"
                                 in_index="${in_index}${changes:+, $changes}"
                                 ;;
                             'A') in_index="${color_added}added" ; ;;
@@ -357,7 +380,7 @@ for spec in "${ls_dirs[@]}" ; do
                         case "$state_y" in
                             ' ') : ;; # No change to worktree
                             'M') in_tree="${color_changed}modified locally"
-                                changes="$(git_line_changes "$spec/$name" tree)"
+                                changes="$(git_line_changes "$specdir" "$name" tree)"
                                 in_tree="${in_tree}${changes:+, $changes}"
                                 ;;
                             'A') in_tree="${color_changed}added locally" ; ;;
