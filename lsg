@@ -201,6 +201,24 @@ function git_line_changes() {
             fi
         fi
     fi
+    if [[ "$diff_line" =~ mode\ change\ ([0-7]{6})\ =\>\ ([0-7]{6}) ]] ; then
+        oldmode="${BASH_REMATCH[1]}"
+        newmode="${BASH_REMATCH[2]}"
+        changemode="$(( 0$oldmode ^ 0$newmode ))"
+        if [[ "$(( changemode & 0111 ))" != 0 ]] ; then
+            # The executable bit changed
+            if [[ "$(( 0$newmode & 0111 ))" != 0 ]] ; then
+                addflags="${addflags}x"
+            else
+                delflags="${delflags}x"
+            fi
+        fi
+
+        flags="${addflags:++${addflags}}${delflags:+-${delflags}}"
+        if [[ "$flags" != '' ]] ; then
+            result="${result}${result:+, }mode ${flags}"
+        fi
+    fi
     echo "$result"
 }
 
