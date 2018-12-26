@@ -60,6 +60,11 @@ else
 fi
 
 
+##
+# Print the relative location compared to the upstream.
+#
+# That is, we print an up arrow with a number if there are changes to push,
+# and a down arrow with a number for changes we can pull.
 function git_relative_state() {
     local dir="$1"
     local upstream
@@ -98,6 +103,38 @@ function git_relative_state() {
         delta="$prompt_git_delta$ahead$behind$prompt_git_reset"
     fi
     echo "$delta"
+}
+
+
+##
+# Print a description of the line changes for a given file (in the cache or in the working tree).
+function git_line_changes() {
+    local file="$1"
+    local where="$2"
+    local arg=''
+    local result=''
+    local diff_line added_lines deleted_lines total_lines
+    local oldmode newmode changemode
+    local delflags addflags flags
+    if [[ "$where" == "cache" ]] ; then
+        arg="--cached"
+    elif [[ "$where" == "tree" ]] ; then
+        arg=""
+    fi
+
+    diff_line="$(git diff $arg --summary --numstat "$spec/$name" | expand)"
+    if [[ "$diff_line" =~ ^([0-9]+)\ +([0-9]+) ]] ; then
+        added_lines="${BASH_REMATCH[1]}"
+        deleted_lines="${BASH_REMATCH[2]}"
+        total_lines="$(( added_lines + deleted_lines ))"
+        if [[ "$total_lines" != '0' ]] ; then
+            result="${total_lines} line"
+            if [[ "${total_lines}" != 1 ]] ; then
+                result="${result}s"
+            fi
+        fi
+    fi
+    echo "$result"
 }
 
 
@@ -205,7 +242,10 @@ for spec in "${ls_dirs[@]}" ; do
                         in_tree=''
                         case "$state_x" in
                             ' ') : ;; # No change to index
-                            'M') in_index="${color_updated}staged" ; ;;
+                            'M') in_index="${color_updated}staged"
+                                changes="$(git_line_changes "$spec/$name" tree)"
+                                in_index="${in_index}${changes:+, $changes}"
+                                ;;
                             'A') in_index="${color_added}added" ; ;;
                             'D') in_index="${color_updated}deleted" ; ;;
                             'R') in_index="${color_updated}renamed" ; ;;
@@ -216,16 +256,8 @@ for spec in "${ls_dirs[@]}" ; do
                         case "$state_y" in
                             ' ') : ;; # No change to worktree
                             'M') in_tree="${color_changed}modified locally"
-                                diff_line="$(git diff --numstat "$spec/$name" | expand)"
-                                if [[ "$diff_line" =~ ^([0-9]+)\ +([0-9]+) ]] ; then
-                                    added_lines="${BASH_REMATCH[1]}"
-                                    deleted_lines="${BASH_REMATCH[1]}"
-                                    total_lines="$(( added_lines + deleted_lines ))"
-                                    in_tree="${in_tree}, ${total_lines} line"
-                                    if [[ "${total_lines}" != 1 ]] ; then
-                                        in_tree="${in_tree}s"
-                                    fi
-                                fi
+                                changes="$(git_line_changes "$spec/$name" tree)"
+                                in_tree="${in_tree}${changes:+, $changes}"
                                 ;;
                             'A') in_tree="${color_changed}added locally" ; ;;
                             'D') in_tree="${color_changed}deleted locally" ; ;;
