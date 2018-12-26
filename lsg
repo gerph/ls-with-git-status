@@ -43,6 +43,48 @@ else
     ls_switches+=('--color=always')
 fi
 
+
+
+# Certain formats need diffferent handling, so we need to detect them here.
+# If you don't trust or care for the handling of these special formats, don't use them.
+include_filetype=false
+# Note: For filetypes we treat all the forms (-F, -p, etc) as identical, so in addition
+#       to / we also process %, =, |, etc. If your filenames end with those characters
+#       they may not be recognised properly.
+is_quoted=false
+is_long=false
+for switch in "${ls_switches[@]}" ; do
+    if [[ "$switch" =~ ^-[^-] ]] ; then
+        # Single '-' switch
+        if [[ "$switch" =~ [Fp] ]] ; then
+            include_filetype=true
+        fi
+        if [[ "$switch" =~ Q ]] ; then
+            is_quoted=true
+        fi
+        if [[ "$switch" =~ l ]] ; then
+            is_long=true
+        fi
+
+    else
+        # Double '-' switch name
+        if [[ "$switch" == '--classify' ||
+              "$switch" == '--file-type' ||
+              "$switch" =~ --indicator-style=(slash|file-type|classify) ]] ; then
+            include_filetype=true
+        fi
+        if [[ "$switch" == '--quote-name' ]] ; then
+            is_quoted=true
+        fi
+    fi
+done
+if ! $is_long ; then
+    # The -1 and the -l options are mutually exclusive, and on BSD
+    # the -1 wins, so we only include the -1 when the -l switch isn't
+    # included.
+    ls_switches+=('-1')
+fi
+
 if [[ "$1" == '--' ]] ; then
     ls_switches+=('--')
     shift
@@ -210,6 +252,7 @@ for spec in "${ls_dirs[@]}" ; do
         | while read line ; do
             label=''
             name=''
+            suffix=''
             line_without_colouring="$(echo "$line" | sed $'s/\x1B\\[[0-9;]*[a-zA-Z]//g')"
             line_length="${#line_without_colouring}"
 
@@ -228,9 +271,43 @@ for spec in "${ls_dirs[@]}" ; do
                 continue
             fi
 
-            if [[ "$line_without_colouring" =~ \ ([^\ ]+)$ || \
-                  "$line_without_colouring" =~ ^([^\ ]+)$ ]] ; then
-                name="${BASH_REMATCH[1]}"
+            if $is_quoted ; then
+                # For the quoted filenames, the symlink target isn't needed, so we don't
+                # need to do checks for it, or anchor to the end of the line.
+                if [[ "$line_without_colouring" =~ \ \"([^\\\"]+)\"([/*@=|%]?) ||
+                      "$line_without_colouring" =~ ^\"([^\\\"]+)\"([/*@=|%]?) ]] ; then
+                    name="${BASH_REMATCH[1]}"
+                    suffix="${BASH_REMATCH[2]}"
+                fi
+
+            else
+                if [[ "$line_without_colouring" =~ \ ([^\ ]+)\ -\> ]] ; then
+                    name="${BASH_REMATCH[1]}"
+                    if $include_filetype && [[ "$name" =~ ([/*@=|%])$ ]] ; then
+                        name="${name:0:-1}"
+                        suffix="${BASH_REMATCH[1]}"
+                    fi
+
+                elif [[ "$line_without_colouring" =~ \ ([^\ ]+)$ || \
+                        "$line_without_colouring" =~ ^([^\ ]+)$ ]] ; then
+                    name="${BASH_REMATCH[1]}"
+                    if $include_filetype && [[ "$name" =~ ([/*@=|%])$ ]] ; then
+                        name="${name:0:-1}"
+                        suffix="${BASH_REMATCH[1]}"
+                    fi
+                fi
+            fi
+
+            # If the spec given was a file, then ls will have included the full path
+            # so we trim this to remove any leading path components.
+            name="${name##*/}"
+
+            # If we don't have a name, there's no point in looking in git.
+            # Similarly, it's probably not helpful to try reporting on the parent
+            # directory.
+            if [[ "$name" == '' || "$name" == '..' ]] ; then
+                echo "$line"
+                continue
             fi
 
             if [[ -d "$spec/$name/.git" || -f "$spec/$name/.git" ]] ; then
