@@ -376,6 +376,21 @@ for spec in "${ls_dirs[@]}" ; do
                 delta="$(git_relative_state "$spec/$name")"
                 label="(${color_branch}${branch}${delta}${color_reset})"
 
+            elif $in_git && [[ -d "$spec/$name" ]] ; then
+                # For directories that aren't git repos or submodules, we will just report whether
+                # they are ignored or not.
+                state="$(git_status_for_file "$specdir" "$name")"
+                state="${state:-  }"
+                state="${state:0:2}"
+
+                case "$state" in
+                    '!!') label="${color_ignored}ignored${color_reset}" ; ;;
+                    '??') label="${color_untracked}untracked${color_reset}" ; ;;
+                esac
+                if [[ "$label" != "" ]] ; then
+                    label="{$label}"
+                fi
+
             elif $in_git && [[ -f "$specdir/$name" ]] ; then
                 # On files, check if the file is up to date or not
                 state="$(git_status_for_file "$specdir" "$name")"
