@@ -4,6 +4,10 @@
 # We accept switches for ls and attempt to mimic the usual behaviour of the tool.
 #
 
+# The command we'll actually run for listing.
+# Replacing this with 'gls' on MacOS with GNU coreutils will run the gnu version instead.
+ls=ls
+
 ls_switches=()
 while [[ "${1:0:1}" == '-' && "$1" != '--' ]] ; do
     # Another parameter for ls_switches
@@ -12,7 +16,7 @@ while [[ "${1:0:1}" == '-' && "$1" != '--' ]] ; do
 done
 
 # Include colouring
-if [[ "$(uname -s)" == 'Darwin' ]] ; then
+if [[ "$(uname -s)" == 'Darwin' && "$ls" == 'ls' ]] ; then
     export CLICOLOR_FORCE=1
     ls_switches+=('-G')
 else
@@ -161,7 +165,7 @@ for spec in "${ls_dirs[@]}" ; do
         in_git=false
     fi
 
-    longest_line="$(ls "${ls_switches[@]}" "$spec" 2> /dev/null \
+    longest_line="$($ls "${ls_switches[@]}" "$spec" 2> /dev/null \
                         | sed $'s/\x1B\\[[0-9;]*[a-zA-Z]//g' \
                         | expand \
                         | awk '{ if ( length > x ) { x = length } } END{ print x }')"
@@ -182,7 +186,7 @@ for spec in "${ls_dirs[@]}" ; do
         git_status=()
     fi
 
-    ls "${ls_switches[@]}" "$spec" \
+    $ls "${ls_switches[@]}" "$spec" \
         | while read line ; do
             label=''
             name=''
