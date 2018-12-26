@@ -211,6 +211,24 @@ if [[ "${BASH_VERSION%%.*}" -ge 4 ]] ; then
 fi
 
 
+##
+# Use either the associative array that we built, OR directly fetch the
+# status of the file.
+function git_status_for_file() {
+    local dir="$1"
+    local name="$2"
+
+    if $has_associative_arrays ; then
+        state="${git_status[$name]}"
+    else
+        state="$(cd "$dir" ; git status --porcelain --ignored "$name" 2> /dev/null \
+                    | grep "^.. $gitsubdir" \
+                    | sed "s/ ${gitsubdir//\//\\/}/ /; /\//d")"
+    fi
+    echo "$state"
+}
+
+
 # I'm going to entirely ignore the problems of filenames with spaces in.
 first=true
 for spec in "${ls_dirs[@]}" ; do
@@ -342,11 +360,7 @@ for spec in "${ls_dirs[@]}" ; do
 
             elif $in_git && [[ -f "$specdir/$name" ]] ; then
                 # On files, check if the file is up to date or not
-                if $has_associative_arrays ; then
-                    state="${git_status[$name]}"
-                else
-                    state="$(cd "$specdir" ; git status --porcelain --ignored "$name" 2> /dev/null)"
-                fi
+                state="$(git_status_for_file "$specdir" "$name")"
                 state="${state:-  }"
                 state="${state:0:2}"
                 state_x="${state:0:1}"
