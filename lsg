@@ -322,7 +322,7 @@ for spec in "${ls_dirs[@]}" ; do
                 continue
             fi
 
-            # If -R was specified then we'll have come lines that are formed as
+            # If -R was specified then we'll have some lines that are formed as
             # <directory>:
             # which indicates a new directory has been entered... so we need to
             # take account of this.
