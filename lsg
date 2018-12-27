@@ -241,7 +241,7 @@ function git_status_for_file() {
     else
         state="$(cd "$dir" && git status --porcelain --ignored "$name" 2> /dev/null \
                     | grep "^.. $gitsubdir" \
-                    | sed "s/ ${gitsubdir//\//\\/}/ /; /\//d")"
+                    | sed "s/ ${gitsubdir//\//\\/}/ /; /\/./d")"
     fi
     echo "$state"
 }
@@ -301,7 +301,7 @@ for spec in "${ls_dirs[@]}" ; do
             done < <(cd "$specdir" && \
                         git status --porcelain --ignored . 2> /dev/null \
                         | grep "^.. $gitsubdir" \
-                        | sed "s/ ${gitsubdir//\//\\/}/ /; /\//d")
+                        | sed "s/ ${gitsubdir//\//\\/}/ /; /\/./d")
         fi
     else
         git_status=()
