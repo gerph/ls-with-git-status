@@ -375,7 +375,7 @@ for spec in "${ls_dirs[@]}" ; do
 
             if [[ -d "$spec/$name/.git" || -f "$spec/$name/.git" ]] ; then
                 # That object is a directory, and is a git repository.
-                branch="$(git --git-dir="$spec/$name/.git" name-rev --exclude origin/HEAD --name-only HEAD 2> /dev/null)"
+                branch="$(git --git-dir="$spec/$name/.git" name-rev --exclude origin/HEAD --exclude 'tags/*' --name-only HEAD 2> /dev/null)"
                 branch="${branch#remotes/}"
                 delta="$(git_relative_state "$spec/$name")"
                 label="(${color_branch}${branch}${delta}${color_reset})"
