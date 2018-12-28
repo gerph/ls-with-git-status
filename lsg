@@ -247,6 +247,9 @@ function git_status_for_file() {
 }
 
 
+# Return code to give on exit
+final_rc=0
+
 # I'm going to entirely ignore the problems of filenames with spaces in.
 first=true
 for spec in "${ls_dirs[@]}" ; do
@@ -457,4 +460,11 @@ for spec in "${ls_dirs[@]}" ; do
                 echo "$line"
             fi
           done
+
+    rc="${PIPESTATUS[0]}"
+    if [[ "$rc" != 0 ]] ; then
+        final_rc="$rc"
+    fi
 done
+
+exit $final_rc
