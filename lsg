@@ -247,6 +247,22 @@ function git_status_for_file() {
 }
 
 
+##
+# Get the status description for a given directory
+#
+# Prints '# modified' and '# staged' for the number of entries.
+function git_status_description_for_dir() {
+    local dir="$1"
+    cd "$dir" || return 0
+    git status --porcelain \
+        | perl -ne 'END {
+                        if ($modified) { print "$modified modified\n" }
+                        if ($staged) { print "$staged staged\n"; }
+                    }
+                    if (/^[MADRC]/) { $staged++; }
+                    if (/^.[MAD]/) { $modified++; }'
+}
+
 # Return code to give on exit
 final_rc=0
 
@@ -382,6 +398,19 @@ for spec in "${ls_dirs[@]}" ; do
                 branch="${branch#remotes/}"
                 delta="$(git_relative_state "$spec/$name")"
                 label="(${color_branch}${branch}${delta}${color_reset})"
+
+                dir_status="$(git_status_description_for_dir "$spec/$name")"
+                status_label=''
+                if [[ "$dir_status" =~ ([0-9]+\ staged) ]] ; then
+                    status_label="${color_updated}${BASH_REMATCH[1]}${color_reset}"
+                fi
+                if [[ "$dir_status" =~ ([0-9]+\ modified) ]] ; then
+                    status_label="${status_label:+${status_label}, }${color_changed}${BASH_REMATCH[1]}${color_reset}"
+                fi
+
+                if [[ "$status_label" != '' ]] ; then
+                    label="${label} (${status_label})"
+                fi
 
             elif $in_git && [[ -d "$spec/$name" ]] ; then
                 # For directories that aren't git repos or submodules, we will just report whether
