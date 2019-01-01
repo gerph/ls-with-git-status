@@ -235,6 +235,7 @@ fi
 function git_status_for_file() {
     local dir="$1"
     local name="$2"
+    local state
 
     if $has_associative_arrays ; then
         state="${git_status[$name]}"
@@ -262,6 +263,77 @@ function git_status_description_for_dir() {
                     if (/^[MADRC]/) { $staged++; }
                     if (/^.[MAD]/) { $modified++; }'
 }
+
+
+##
+# Describe how the submodule sha ref has changed. (internal)
+# Used to determine the state for the working tree or index.
+#
+# Prints '# forward', '# back', or 'ref changed'.
+function git_submodule_state_int() {
+    local dir="$1"
+    local name="$2"
+    local cached="$3"
+    local submodule_diff oldsha newsha change
+
+    cd "$dir" || return 0
+    submodule_diff=$(git diff ${cached:+--cached} "$name" 2>/dev/null)
+    oldsha=''
+    newsha=''
+    if [[ "$submodule_diff" =~ -Subproject\ commit\ ([0-9a-f]+) ]] ; then
+        oldsha="${BASH_REMATCH[1]}"
+    fi
+    if [[ "$submodule_diff" =~ \+Subproject\ commit\ ([0-9a-f]+) ]] ; then
+        # Note: We can ignore the -dirty on the end, as we know that the
+        #       file state will be reported separately.
+        newsha="${BASH_REMATCH[1]}"
+    fi
+    if [[ "$newsha" == '' || "$oldsha" == '' || "$oldsha" == "$newsha" ]] ; then
+        # no differences reported, so this submodule is the same
+        return 0
+    fi
+    cd "$name" || return 0
+
+    # Try to decide if we've gone forward or back (or possibly moved to
+    # a completely different tree.
+    change="$(git log --format=%H $oldsha..$newsha 2> /dev/null | wc -l)"
+    if [[ "$change" -ne 0 ]] ; then
+        echo "$(( change + 0 )) forward"
+        return
+    fi
+    change="$(git log --format=%H $newsha..$oldsha 2> /dev/null | wc -l)"
+    if [[ "$change" -ne 0 ]] ; then
+        echo "$(( change + 0 )) back"
+        return
+    fi
+
+    # If we couldn't place the new sha in the same tree as the old one,
+    # we just report that it is a new sha.
+    echo "new ref"
+}
+
+
+##
+# Describe how the submodule sha ref has changed.
+#
+# Prints sha changes, with colouring.
+function git_submodule_state() {
+    local dir="$1"
+    local name="$2"
+
+    working="$(git_submodule_state_int "$dir" "$name")"
+    cached="$(git_submodule_state_int "$dir" "$name" 'cached')"
+
+    status=''
+    if [[ "$cached" != '' ]] ; then
+        status="${color_updated}staged ${cached}${color_reset}"
+    fi
+    if [[ "$working" != '' ]] ; then
+        status="${status:+${status}, }${color_changed}${working}${color_reset}"
+    fi
+    echo "${status}"
+}
+
 
 # Return code to give on exit
 final_rc=0
@@ -392,14 +464,18 @@ for spec in "${ls_dirs[@]}" ; do
                 continue
             fi
 
-            if [[ -d "$spec/$name/.git" || -f "$spec/$name/.git" ]] ; then
+            if [[ -d "$specdir/$name/.git" || -f "$specdir/$name/.git" ]] ; then
                 # That object is a directory, and is a git repository.
-                branch="$(git --git-dir="$spec/$name/.git" name-rev --exclude origin/HEAD --exclude 'tags/*' --name-only HEAD 2> /dev/null)"
+                branch="$(git --git-dir="$specdir/$name/.git" name-rev --exclude origin/HEAD --exclude 'tags/*' --name-only HEAD 2> /dev/null)"
                 branch="${branch#remotes/}"
-                delta="$(git_relative_state "$spec/$name")"
+                delta="$(git_relative_state "$specdir/$name")"
+                if [[ -f "$spec/$name/.git" ]] ; then
+                    submodule_delta="$(git_submodule_state "$specdir" "$name")"
+                    delta="${delta}${submodule_delta:+ $submodule_delta}"
+                fi
                 label="(${color_branch}${branch}${delta}${color_reset})"
 
-                dir_status="$(git_status_description_for_dir "$spec/$name")"
+                dir_status="$(git_status_description_for_dir "$specdir/$name")"
                 status_label=''
                 if [[ "$dir_status" =~ ([0-9]+\ staged) ]] ; then
                     status_label="${color_updated}${BASH_REMATCH[1]}${color_reset}"
@@ -409,10 +485,10 @@ for spec in "${ls_dirs[@]}" ; do
                 fi
 
                 if [[ "$status_label" != '' ]] ; then
-                    label="${label} (${status_label})"
+                    label="${label} {${status_label}}"
                 fi
 
-            elif $in_git && [[ -d "$spec/$name" ]] ; then
+            elif $in_git && [[ -d "$specdir/$name" ]] ; then
                 # For directories that aren't git repos or submodules, we will just report whether
                 # they are ignored or not.
                 state="$(git_status_for_file "$specdir" "$name")"
