@@ -3,6 +3,45 @@
 # List files, including git information in the output.
 # We accept switches for ls and attempt to mimic the usual behaviour of the tool.
 #
+# Git annotations::
+#
+# Files within a git repository:
+#   * File changes are only shown in braces.
+#   * Untracked and ignored files are shown:
+#       {untracked}                 - File is not known to git
+#       {ignored}                   - File is listed as a pattern in .gitignore
+#   * Changed files in the working tree are shown:
+#       {modified locally, 3 lines} - Changed in working tree, 3 lines affected (added or deleted)
+#       {deleted locally}           - File has been deleted in working tree
+#   * Changed files in the cache are shown:
+#       {staged, 3 lines}           - Changes have been staged, 3 lines affected (added or deleted)
+#       {deleted}                   - File has been marked for deletion in cache
+#       {added}                     - File has been marked for addition in cache
+#       {renamed}                   - File has been renamed to this name in the cache
+#   * Merge status is show:
+#       {unmeged, both added}       - File was added by merge, and we added it as well.
+#
+# Directories within a git repository:
+#   * Only untracked or ignored state is shown (to make lists faster):
+#       {untracked}                 - Directory is not known to git
+#       {ignored}                   - Directory is listed as a pattern in .gitignore
+#
+# Repositories and submodules:
+#   * Branch details are in brackets:
+#       (master)            - directory is on at the head of branch master
+#   * Relative location compared to upstream is shown with arrows after the name
+#       (master￪1)          - 1 commits locally ready to be pushed
+#       (master￬7)          - 8 commits available in fetched upstream
+#   * Submodule reference changes are described within the brackets:
+#       (master 8 forward)  - Submodule has moved 8 changes forward in the same tree (in working tree)
+#       (master 2 back)     - Submodule has moved 2 changes forward in the same tree (in working tree)
+#       (master new ref)    - Submodule has changed to a ref unrelated to the old tree (in working tree)
+#       (master staged 1 forward)   - Submodule has moved 1 changes forward in the same tree (in the cache)
+#   * Summary of changes to the files within the submodule are shown in braces:
+#       {1 modified}        - 1 file has been changed in the working tree
+#       {2 staged}          - 2 files have been changed and staged in the working tree
+#   * All the above options can be combined.
+#
 
 # The command we'll actually run for listing.
 # Replacing this with 'gls' on MacOS with GNU coreutils will run the gnu version instead.
@@ -392,7 +431,8 @@ for spec in "${ls_dirs[@]}" ; do
             done < <(cd "$specdir" && \
                         git status --porcelain --ignored . 2> /dev/null \
                         | grep "^.. $gitsubdir" \
-                        | sed "s/ ${gitsubdir//\//\\/}/ /; /\/./d")
+                        | sed "s/ ${gitsubdir//\//\\/}/ /g; /\/./d" \
+                        | sed -E 's/^(..) (.*) -> /\1 /')
         fi
     else
         git_status=()
@@ -543,6 +583,7 @@ for spec in "${ls_dirs[@]}" ; do
                                 in_tree="${in_tree}${changes:+, $changes}"
                                 ;;
                             'A') in_tree="${color_changed}added locally" ; ;;
+                                # Note: 'Added locally' should never appear, as such files are 'untracked'
                             'D') in_tree="${color_changed}deleted locally" ; ;;
                             *) in_tree="?$state_y?"
                         esac
