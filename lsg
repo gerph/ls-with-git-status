@@ -65,7 +65,7 @@ ls='ls'
 # Generate warning messages.
 function warning() {
     local msg="$1"
-    echo $'\e[33mWarning: '"$msg" >&2
+    echo -e "\e[33mWarning: $msg\e[0m" >&2
 }
 
 
