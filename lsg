@@ -42,10 +42,32 @@
 #       {2 staged}          - 2 files have been changed and staged in the working tree
 #   * All the above options can be combined.
 #
+# Required commands::
+#   * bash - version 3 or 4; although it'll be slower on 3 due to lack of associative arrays
+#   * git
+#   * ls
+#       - BSD version supplied with Mac OS or a GNU version
+#       - colour is supported (and explicitly forced)
+#   * perl - version 5 upward (although might be version 3 compatible)
+#   * grep - BSD version supplied with Mac OS or a GNU version
+#   * sed - BSD version supplied with Mac OS or a GNU version
+#
 
 # The command we'll actually run for listing.
 # Replacing this with 'gls' on MacOS with GNU coreutils will run the gnu version instead.
 ls='ls'
+
+# Note: Decide what to do about GNU options for escaping (-b, -N, -q)
+#       These won't appear often in filenames, but we're trying to be all
+#       inclusive.
+
+##
+# Generate warning messages.
+function warning() {
+    local msg="$1"
+    echo $'\e[33mWarning: '"$msg" >&2
+}
+
 
 ls_switches=()
 warned=false
@@ -55,13 +77,21 @@ while [[ "${1:0:1}" == '-' && "$1" != '--' ]] ; do
     # Certain switches are not supported and must be ignored.
     if [[ "$switch" =~ ^-[^-] ]] ; then
         # Single '-' switch
-        while [[ "$switch" =~ ^(.*)([Cx])(.*)$ ]] ; do
-            # Multi column format was requested.
+        while [[ "$switch" =~ ^(.*)([DCxm])(.*)$ ]] ; do
+            # -C or -x: Multi column format.
+            # -m: comma separated format.
+            # -D: dired format
             # That's not possible for us, so we trim it out.
             switch="${BASH_REMATCH[1]}${BASH_REMATCH[3]}"
-            echo "Warning: Ignoring switch -${BASH_REMATCH[2]}" >&2
+            warning "Ignoring switch -${BASH_REMATCH[2]}"
             warned=true
         done
+    elif [[ "$switch" =~ ^--format=(commas|vertical|across|horizontal) || \
+            "$switch" =~ ^--dired ]] ; then
+        warning "Ignoring switch $switch"
+        warned=true
+        shift
+        continue
     fi
     if [[ "$switch" != '-' ]] ; then
         ls_switches+=("$switch")
