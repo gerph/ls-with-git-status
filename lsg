@@ -32,6 +32,7 @@
 #   * Relative location compared to upstream is shown with arrows after the name
 #       (master￪1)          - 1 commits locally ready to be pushed
 #       (master￬7)          - 8 commits available in fetched upstream
+#       (master⊗)           - no upstream is configured
 #   * Submodule reference changes are described within the brackets:
 #       (master 8 forward)  - Submodule has moved 8 changes forward in the same tree (in working tree)
 #       (master 2 back)     - Submodule has moved 2 changes forward in the same tree (in working tree)
@@ -193,6 +194,10 @@ else
     prompt_git_ahead_symbol="￪"
     prompt_git_behind_symbol="￬"
 fi
+# The circled x below is nice, but in OS X Terminal it is cradled in the following bracket
+#prompt_git_noupstream_symbol="⨂"
+# The cirlced x below is smaller, so doesn't look quite so odd
+prompt_git_noupstream_symbol="⊗"
 
 
 ##
@@ -206,6 +211,7 @@ function git_relative_state() {
     local upstreamrefname
     local behind
     local ahead
+    local noupstream
     local delta
 
     cd "$dir" || return
@@ -232,10 +238,12 @@ function git_relative_state() {
                 ahead=''
             fi
         fi
+    else
+        noupstream="$prompt_git_noupstream_symbol"
     fi
 
-    if [[ "${ahead}${behind}" != '' ]] ; then
-        delta="$prompt_git_delta$ahead$behind$prompt_git_reset"
+    if [[ "${noupstream}${ahead}${behind}" != '' ]] ; then
+        delta="${prompt_git_delta}${noupstream}${ahead}${behind}${prompt_git_reset}"
     fi
     echo "$delta"
 }
