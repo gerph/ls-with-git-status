@@ -123,6 +123,7 @@ include_filetype=false
 #       they may not be recognised properly.
 is_quoted=false
 is_long=false
+dirs_as_files=false
 for switch in "${ls_switches[@]}" ; do
     if [[ "$switch" =~ ^-[^-] ]] ; then
         # Single '-' switch
@@ -134,6 +135,9 @@ for switch in "${ls_switches[@]}" ; do
         fi
         if [[ "$switch" =~ l ]] ; then
             is_long=true
+        fi
+        if [[ "$switch" =~ d ]] ; then
+            dirs_as_files=true
         fi
 
     else
@@ -415,10 +419,21 @@ function git_submodule_state() {
 # Return code to give on exit
 final_rc=0
 
+# When run in 'dirs_as_files' mode (-d) the lines won't be broken up by the
+# directory separations - because all specified files are to be shown as
+# files. So we need to work out the padding length over all the names we're
+# examining.
+if $dirs_as_files ; then
+    longest_line="$($ls "${ls_switches[@]}" "${ls_dirs[@]}" 2> /dev/null \
+                        | sed $'s/\x1B\\[[0-9;]*[a-zA-Z]//g' \
+                        | expand \
+                        | awk '{ if ( length > x ) { x = length } } END{ print x }')"
+fi
+
 # I'm going to entirely ignore the problems of filenames with spaces in.
 first=true
 for spec in "${ls_dirs[@]}" ; do
-    if [[ "${#ls_dirs[@]}" -gt 1 ]] ; then
+    if [[ "${#ls_dirs[@]}" -gt 1 ]] && ! $dirs_as_files ; then
         # Mimic the ls behaviour of writing out the directory name when listing multiple dirs
         if ! $first ; then
             echo
@@ -431,6 +446,9 @@ for spec in "${ls_dirs[@]}" ; do
     if [[ -f "$spec" ]] ; then
         specdir="$(dirname "$spec")"
     fi
+    if $dirs_as_files ; then
+        specdir="$(dirname "$spec")"
+    fi
     if [[ -e "$spec" ]] ; then
         in_git="$(cd "$specdir" && git rev-parse --is-inside-work-tree 2> /dev/null)"
         in_git="${in_git:-false}"
@@ -438,10 +456,12 @@ for spec in "${ls_dirs[@]}" ; do
         in_git=false
     fi
 
-    longest_line="$($ls "${ls_switches[@]}" "$spec" 2> /dev/null \
-                        | sed $'s/\x1B\\[[0-9;]*[a-zA-Z]//g' \
-                        | expand \
-                        | awk '{ if ( length > x ) { x = length } } END{ print x }')"
+    if ! $dirs_as_files ; then
+        longest_line="$($ls "${ls_switches[@]}" "${ls_dirs[@]}" 2> /dev/null \
+                            | sed $'s/\x1B\\[[0-9;]*[a-zA-Z]//g' \
+                            | expand \
+                            | awk '{ if ( length > x ) { x = length } } END{ print x }')"
+    fi
 
     if $in_git ; then
         # `git status` will only produce statuses relative to the
