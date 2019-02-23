@@ -236,9 +236,13 @@ function git_relative_state() {
     fi
     if [[ "$gitdir" != '' ]] ; then
         head="$(cat "$gitdir/HEAD")"
-        if [[ "${head:0:4}" != 'ref:' ]] ; then
+        if [[ "${head:0:5}" != 'ref: ' ]] ; then
             # This is not a ref; so we're in detached state
             state="$prompt_git_detached_symbol"
+        elif [[ ! -d "$gitdir/${head:5}" ]] ; then
+            # The ref that is supplied doesn't exist - so this
+            # is an empty repository.
+            return
         fi
     fi
 
@@ -379,6 +383,9 @@ function git_branch_for_dir() {
     local branch
     branch="$(git --git-dir="$dir/.git" name-rev --exclude origin/HEAD --exclude 'tags/*' --name-only HEAD 2> /dev/null)"
     branch="${branch#remotes/}"
+    if [[ "$branch" == '' ]] ; then
+        branch='<no-branch>'
+    fi
     echo -n "$branch"
 }
 
