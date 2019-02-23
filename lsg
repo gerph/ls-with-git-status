@@ -33,6 +33,7 @@
 #       (master￪1)          - 1 commits locally ready to be pushed
 #       (master￬7)          - 8 commits available in fetched upstream
 #       (master⊗)           - no upstream is configured
+#       (master~2○)         - detached head
 #   * Submodule reference changes are described within the brackets:
 #       (master 8 forward)  - Submodule has moved 8 changes forward in the same tree (in working tree)
 #       (master 2 back)     - Submodule has moved 2 changes forward in the same tree (in working tree)
@@ -203,6 +204,9 @@ fi
 # The cirlced x below is smaller, so doesn't look quite so odd
 prompt_git_noupstream_symbol="⊗"
 
+# When we're running with a detached HEAD (ie a sha, rather than a ref as head):
+prompt_git_detached_symbol="○"
+
 
 ##
 # Print the relative location compared to the upstream.
@@ -215,39 +219,59 @@ function git_relative_state() {
     local upstreamrefname
     local behind
     local ahead
-    local noupstream
+    local state
     local delta
+    local gitdir
+    local head
 
     cd "$dir" || return
 
-    # Check if we have an upstream configured
-    upstream="$(git for-each-ref --format='%(upstream:short)' "$(git symbolic-ref -q HEAD)")"
-    upstreamrefname='upstream'
-    if [[ "$upstream" == '' ]] ; then
-        upstream="$(git for-each-ref --format='%(push:short)' "$(git symbolic-ref -q HEAD)")"
-        upstreamrefname='push'
-    fi
-    if [[ "$upstream" != '' ]] ; then
-        behind="$(git rev-list --count "@..@{${upstreamrefname}}" 2>/dev/null)"
-        ahead="$(git rev-list --count "@{${upstreamrefname}}..@" 2>/dev/null)"
-        if [[ "${ahead}${behind}" != '' ]] ; then
-            if [[ "${behind}" != '0' ]] ; then
-                behind="$prompt_git_behind_symbol$behind"
-            else
-                behind=''
-            fi
-            if [[ "${ahead}" != '0' ]] ; then
-                ahead="$prompt_git_ahead_symbol$ahead"
-            else
-                ahead=''
-            fi
+    if [[ -f ".git" ]] ; then
+        gitdir="$(cat ".git")"
+        if [[ "${gitdir:0:8}" == 'gitdir: ' ]] ; then
+            gitdir="${gitdir:8}"
         fi
-    else
-        noupstream="$prompt_git_noupstream_symbol"
+    elif [[ -d ".git" ]] ; then
+        gitdir=".git"
+    fi
+    if [[ "$gitdir" != '' ]] ; then
+        head="$(cat "$gitdir/HEAD")"
+        if [[ "${head:0:4}" != 'ref:' ]] ; then
+            # This is not a ref; so we're in detached state
+            state="$prompt_git_detached_symbol"
+        fi
     fi
 
-    if [[ "${noupstream}${ahead}${behind}" != '' ]] ; then
-        delta="${prompt_git_delta}${noupstream}${ahead}${behind}${prompt_git_reset}"
+    if [[ "$state" == "" ]] ; then
+        # Check if we have an upstream configured
+        upstream="$(git for-each-ref --format='%(upstream:short)' "$(git symbolic-ref -q HEAD)")"
+        upstreamrefname='upstream'
+        if [[ "$upstream" == '' ]] ; then
+            upstream="$(git for-each-ref --format='%(push:short)' "$(git symbolic-ref -q HEAD)")"
+            upstreamrefname='push'
+        fi
+        if [[ "$upstream" != '' ]] ; then
+            behind="$(git rev-list --count "@..@{${upstreamrefname}}" 2>/dev/null)"
+            ahead="$(git rev-list --count "@{${upstreamrefname}}..@" 2>/dev/null)"
+            if [[ "${ahead}${behind}" != '' ]] ; then
+                if [[ "${behind}" != '0' ]] ; then
+                    behind="$prompt_git_behind_symbol$behind"
+                else
+                    behind=''
+                fi
+                if [[ "${ahead}" != '0' ]] ; then
+                    ahead="$prompt_git_ahead_symbol$ahead"
+                else
+                    ahead=''
+                fi
+            fi
+        else
+            state="$prompt_git_noupstream_symbol"
+        fi
+    fi
+
+    if [[ "${state}${ahead}${behind}" != '' ]] ; then
+        delta="${prompt_git_delta}${state}${ahead}${behind}${prompt_git_reset}"
     fi
     echo "$delta"
 }
@@ -343,6 +367,19 @@ function git_status_description_for_dir() {
                     }
                     if (/^[MADRC]/) { $staged++; }
                     if (/^.[MAD]/) { $modified++; }'
+}
+
+
+##
+# Get the name of a branch, for a given directory
+#
+# @param $1 directory to report the branch from.
+function git_branch_for_dir() {
+    local dir="$1"
+    local branch
+    branch="$(git --git-dir="$dir/.git" name-rev --exclude origin/HEAD --exclude 'tags/*' --name-only HEAD 2> /dev/null)"
+    branch="${branch#remotes/}"
+    echo -n "$branch"
 }
 
 
@@ -564,8 +601,7 @@ for spec in "${ls_dirs[@]}" ; do
 
             if [[ -d "$specdir/$name/.git" || -f "$specdir/$name/.git" ]] ; then
                 # That object is a directory, and is a git repository.
-                branch="$(git --git-dir="$specdir/$name/.git" name-rev --exclude origin/HEAD --exclude 'tags/*' --name-only HEAD 2> /dev/null)"
-                branch="${branch#remotes/}"
+                branch="$(git_branch_for_dir "$specdir/$name")"
                 delta="$(git_relative_state "$specdir/$name")"
                 if [[ -f "$spec/$name/.git" ]] ; then
                     submodule_delta="$(git_submodule_state "$specdir" "$name")"
