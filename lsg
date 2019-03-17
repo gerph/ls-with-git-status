@@ -163,6 +163,12 @@ for switch in "${ls_switches[@]}" ; do
         fi
         if [[ "$switch" =~ d ]] ; then
             dirs_as_files=true
+            # Disable our nested display if they explicitly requested dirs-as-files
+            lsg_nest=
+        fi
+        if [[ "$switch" =~ R ]] ; then
+            # Disable our nested display if they wanted recursion
+            lsg_nest=
         fi
 
     else
@@ -174,6 +180,10 @@ for switch in "${ls_switches[@]}" ; do
         fi
         if [[ "$switch" == '--quote-name' ]] ; then
             is_quoted=true
+        fi
+        if [[ "$switch" == '--recursion' ]] ; then
+            # Disable our nested display if they wanted recursion
+            lsg_nest=
         fi
     fi
 done
@@ -585,7 +595,19 @@ for spec in "${ls_dirs[@]}" ; do
             # take account of this.
             if [[ "$line_without_colouring" =~ ^(.*):$ ]] ; then
                 spec="${BASH_REMATCH[1]}"
+                specdir="$spec"
                 echo "${color_bold}$spec${color_reset}:"
+                # Fall back to the direct method of getting the git status
+                has_associative_arrays=false
+
+                # Fix up the gitsubdir
+                if $in_git ; then
+                    # See comment above about gitsubdir
+                    fulldir="$(cd "$specdir" && pwd -P)"
+                    gitbase="$(cd "$specdir" && git rev-parse --show-toplevel)"
+                    gitsubdir="${fulldir:${#gitbase}+1}"
+                    gitsubdir="$gitsubdir${gitsubdir:+/}"
+                fi
                 continue
             fi
 
