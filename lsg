@@ -3,6 +3,17 @@
 # List files, including git information in the output.
 # We accept switches for ls and attempt to mimic the usual behaviour of the tool.
 #
+# In addition, switches dedicated to lsg are also supported:
+#
+#   --nest, --nest=<depth>
+#       Causes lsg to re-invoke itself on any directories encountered up to the depth specified
+#       or recursively if no specific depth was supplied.
+#       May also set the environment variable `LSG_NEST` to true or a number to force this
+#       behaviour.
+#
+#   --no-nest
+#       Disable recursive listing of directories.
+#
 # Git annotations::
 #
 # Files within a git repository:
@@ -70,6 +81,8 @@ function warning() {
     echo -e "\e[33mWarning: $msg\e[0m" >&2
 }
 
+# Our custom switches
+lsg_nest=${LSG_NEST:-}
 
 ls_switches=()
 warned=false
@@ -92,6 +105,17 @@ while [[ "${1:0:1}" == '-' && "$1" != '--' ]] ; do
             "$switch" =~ ^--dired ]] ; then
         warning "Ignoring switch $switch"
         warned=true
+        shift
+        continue
+    elif [[ "$switch" =~ ^--(no-)?nest(=[0-9]+)?$ ]] ; then
+        if [[ "$switch" =~ ^--nest=?([0-9]+)? ]] ; then
+            lsg_nest=true
+            if [[ "${BASH_REMATCH[1]:-}" ]] ; then
+                lsg_nest=${BASH_REMATCH[1]:-}
+            fi
+        else
+            lsg_nest=
+        fi
         shift
         continue
     fi
@@ -705,6 +729,21 @@ for spec in "${ls_dirs[@]}" ; do
                 printf "%s  %*s%s\n" "$line" $((longest_line - line_length)) "" "$label"
             else
                 echo "$line"
+            fi
+
+            # If this is a directory, and nesting requested, recurse.
+            if [[ -d "$specdir/$name/" && "$lsg_nest" != '' ]] ; then
+                if [[ "$lsg_nest" == 'true' ]] ; then
+                    next_nest=(--nest)
+                else
+                    next_nest=$(( lsg_nest - 1 ))
+                    if [[ "$next_nest" -le 0 ]] ; then
+                        next_nest=(--no-nest)
+                    else
+                        next_nest=(--nest=$next_nest)
+                    fi
+                fi
+                "$0" "${next_nest[@]}" "${ls_switches[@]}" "$specdir/$name"| sed 's/^/  /'
             fi
           done
 
