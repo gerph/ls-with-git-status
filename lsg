@@ -754,7 +754,9 @@ for spec in "${ls_dirs[@]}" ; do
             fi
 
             # If this is a directory, and nesting requested, recurse.
-            if [[ -d "$specdir/$name/" && "$lsg_nest" != '' ]] ; then
+            if [[ -d "$specdir/$name/" && \
+                  "$lsg_nest" != '' && \
+                  "$name" != '.' && "$name" != '..' ]] ; then
                 if [[ "$lsg_nest" == 'true' ]] ; then
                     next_nest=(--nest)
                 else
