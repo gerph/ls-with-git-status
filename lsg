@@ -46,6 +46,7 @@
 #       (master⊗)           - no upstream is configured
 #       (master~2○)         - detached head
 #   * Submodule reference changes are described within the brackets:
+#       (master added)      - Submodule has been added
 #       (master 8 forward)  - Submodule has moved 8 changes forward in the same tree (in working tree)
 #       (master 2 back)     - Submodule has moved 2 changes forward in the same tree (in working tree)
 #       (master new ref)    - Submodule has changed to a ref unrelated to the old tree (in working tree)
@@ -656,10 +657,25 @@ for spec in "${ls_dirs[@]}" ; do
                 # That object is a directory, and is a git repository.
                 branch="$(git_branch_for_dir "$specdir/$name")"
                 delta="$(git_relative_state "$specdir/$name")"
-                if [[ -f "$spec/$name/.git" ]] ; then
+                submodule_state=
+                if [[ -f "$specdir/$name/.git" ]] ; then
+                    # A submodule, so determine whether the module has been
+                    # added or not.
+                    state="$(git_status_for_file "$specdir" "$name")"
+                    state="${state:-  }"
+                    state="${state:0:2}"
+
+                    case "$state" in
+                        'AM'|'A ') submodule_state="${color_added}added${color_reset}" ; ;;
+                    esac
+
+                    # And the how it relates to the state we have in git
                     submodule_delta="$(git_submodule_state "$specdir" "$name")"
-                    delta="${delta}${submodule_delta:+ $submodule_delta}"
+                    if [[ "$submodule_delta" != '' ]] ; then
+                        submodule_state="${submodule_state}${submodule_state:+, $submodule_delta}"
+                    fi
                 fi
+                delta="${delta}${submodule_state:+ $submodule_state}"
                 label="(${color_branch}${branch}${delta}${color_reset})"
 
                 dir_status="$(git_status_description_for_dir "$specdir/$name")"
