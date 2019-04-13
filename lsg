@@ -39,7 +39,7 @@
 #
 # Repositories and submodules:
 #   * Branch details are in brackets:
-#       (master)            - directory is on at the head of branch master
+#       (master)            - directory is at the head of branch master
 #   * Relative location compared to upstream is shown with arrows after the name
 #       (master￪1)          - 1 commits locally ready to be pushed
 #       (master￬7)          - 8 commits available in fetched upstream
@@ -672,7 +672,7 @@ for spec in "${ls_dirs[@]}" ; do
                     # And the how it relates to the state we have in git
                     submodule_delta="$(git_submodule_state "$specdir" "$name")"
                     if [[ "$submodule_delta" != '' ]] ; then
-                        submodule_state="${submodule_state}${submodule_state:+, $submodule_delta}"
+                        submodule_state="${submodule_state:+$submodule_state, }$submodule_delta"
                     fi
                 fi
                 delta="${delta}${submodule_state:+ $submodule_state}"
