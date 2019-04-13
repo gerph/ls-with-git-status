@@ -52,7 +52,7 @@ Repositories and submodules:
       - `(master~2○)`         - detached head
   * Submodule reference changes are described within the brackets:
       - `(master added)`      - Submodule has been added
-      - `(master 8 forward)-  - Submodule has moved 8 changes forward in the same tree (in working tree)
+      - `(master 8 forward)`  - Submodule has moved 8 changes forward in the same tree (in working tree)
       - `(master 2 back)`     - Submodule has moved 2 changes forward in the same tree (in working tree)
       - `(master new ref)`    - Submodule has changed to a ref unrelated to the old tree (in working tree)
       - `(master staged 1 forward)`   - Submodule has moved 1 changes forward in the same tree (in the cache)
