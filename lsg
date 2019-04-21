@@ -274,7 +274,7 @@ function git_relative_state() {
         if [[ "${head:0:5}" != 'ref: ' ]] ; then
             # This is not a ref; so we're in detached state
             state="$prompt_git_detached_symbol"
-        elif [[ ! -d "$gitdir/${head:5}" ]] ; then
+        elif [[ ! -e "$gitdir/${head:5}" ]] ; then
             # The ref that is supplied doesn't exist - so this
             # is an empty repository.
             return
