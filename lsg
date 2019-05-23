@@ -86,6 +86,7 @@ function warning() {
 lsg_nest=${LSG_NEST:-}
 
 ls_switches=()
+special=
 warned=false
 # Track the switches we pass to ls in ls_switches
 while [[ "${1:0:1}" == '-' && "$1" != '--' ]] ; do
@@ -102,6 +103,10 @@ while [[ "${1:0:1}" == '-' && "$1" != '--' ]] ; do
             warning "Ignoring switch -${BASH_REMATCH[2]}"
             warned=true
         done
+    elif [[ "$switch" =~ ^--(help|version)$ ]] ; then
+        special="${BASH_REMATCH[1]}"
+        shift
+        continue
     elif [[ "$switch" =~ ^--format=(commas|vertical|across|horizontal) || \
             "$switch" =~ ^--dired ]] ; then
         warning "Ignoring switch $switch"
@@ -129,6 +134,31 @@ done
 if $warned ; then
     # A blank line to separate our warnings from the main output
     echo >&2
+fi
+
+if [[ "$special" != '' ]] ; then
+    # Either 'help' or 'version' requested.
+    if [[ "$special" == 'help' ]] ; then
+        # BSD ls does not have a --help, so we just continue on even if it fails -
+        # the --help will print out a syntax message, which is useful to the user
+        # anyhow.
+        ls --help || true
+        echo
+        echo "$(basename "$0") options:"
+        echo "   --nest, --nest=<depth>"
+        echo "      Causes lsg to re-invoke itself on any directories encountered up to the depth"
+        echo "      specified or recursively if no specific depth was supplied."
+        echo "      May also set the environment variable 'LSG_NEST' to true or a number to force"
+        echo "      this behaviour."
+        echo "    --no-nest"
+        echo "      Disable the above behaviour"
+    elif [[ "$special" == 'version' ]] ; then
+        # Again, BSD ls does not have --version, but the syntax message is fine,
+        # I think.
+        ls --version || true
+        echo "$(basename "$0") (ls-with-git-status) "'$Id$'
+    fi
+    exit 0
 fi
 
 # Include colouring

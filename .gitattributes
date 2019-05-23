@@ -1,0 +1,2 @@
+# Use $Id$ expansion, so that the version message includes a SHA1 to identify the version.
+lsg     ident
