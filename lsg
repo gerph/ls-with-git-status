@@ -152,6 +152,15 @@ if [[ "$special" != '' ]] ; then
         echo "      this behaviour."
         echo "    --no-nest"
         echo "      Disable the above behaviour"
+        echo
+        echo "Unsupported ls options:"
+        echo "    --format=(commas|vertical|across|horizontal)"
+        echo "    -c | -x | -m"
+        echo "      These options don't leave space for lsg to annotate the output, so will be"
+        echo "      ignored if they are used. Only the 1-file-per-line format is supported."
+        echo "    --dired | -D"
+        echo "      The --dired option does not make sense - it wouldn't be understood if the"
+        echo "      annotations were added to the output"
     elif [[ "$special" == 'version' ]] ; then
         # Again, BSD ls does not have --version, but the syntax message is fine,
         # I think.
