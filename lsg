@@ -3,16 +3,25 @@
 # List files, including git information in the output.
 # We accept switches for ls and attempt to mimic the usual behaviour of the tool.
 #
-# In addition, switches dedicated to lsg are also supported:
+# In addition, switches dedicated to lsg are also supported::
 #
 #   --nest, --nest=<depth>
-#       Causes lsg to re-invoke itself on any directories encountered up to the depth specified
-#       or recursively if no specific depth was supplied.
-#       May also set the environment variable `LSG_NEST` to true or a number to force this
-#       behaviour.
+#       Causes lsg to re-invoke itself on any directories encountered up to the
+#       depth specified or recursively if no specific depth was supplied.
+#       May also set the environment variable `LSG_NEST` to true or a number to
+#       force this behaviour.
 #
 #   --no-nest
 #       Disable recursive listing of directories.
+#
+# Unsupported ls options::
+#   --format=(commas|vertical|across|horizontal)
+#   -c | -x | -m
+#       These options don't leave space for lsg to annotate the output, so will be
+#       ignored if they are used. Only the 1-file-per-line format is supported.
+#   --dired | -D
+#       The --dired option does not make sense - it wouldn't be understood if the
+#       annotations were added to the output.
 #
 # Git annotations::
 #
@@ -55,6 +64,8 @@
 #       {1 modified}        - 1 file has been changed in the working tree
 #       {2 staged}          - 2 files have been changed and staged in the working tree
 #   * All the above options can be combined.
+
+# Note: The above messages are help text.
 #
 # Required commands::
 #   * bash - version 3 or 4; although it'll be slower on 3 due to lack of associative arrays
@@ -143,24 +154,12 @@ if [[ "$special" != '' ]] ; then
         # the --help will print out a syntax message, which is useful to the user
         # anyhow.
         ls --help || true
+        # Use the help from the comments at the head of the file, as that way
+        # there is only one source of truth for this message.
         echo
-        echo "$(basename "$0") options:"
-        echo "   --nest, --nest=<depth>"
-        echo "      Causes lsg to re-invoke itself on any directories encountered up to the depth"
-        echo "      specified or recursively if no specific depth was supplied."
-        echo "      May also set the environment variable 'LSG_NEST' to true or a number to force"
-        echo "      this behaviour."
-        echo "    --no-nest"
-        echo "      Disable the above behaviour"
+        echo "lsg: ls-with-git-status"
         echo
-        echo "Unsupported ls options:"
-        echo "    --format=(commas|vertical|across|horizontal)"
-        echo "    -c | -x | -m"
-        echo "      These options don't leave space for lsg to annotate the output, so will be"
-        echo "      ignored if they are used. Only the 1-file-per-line format is supported."
-        echo "    --dired | -D"
-        echo "      The --dired option does not make sense - it wouldn't be understood if the"
-        echo "      annotations were added to the output"
+        sed -E -e '1,2d' -e '/^$/q' -e 's/^# ?//' < "$0"
     elif [[ "$special" == 'version' ]] ; then
         # Again, BSD ls does not have --version, but the syntax message is fine,
         # I think.
