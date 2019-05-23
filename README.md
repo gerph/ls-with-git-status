@@ -33,7 +33,7 @@ Files within a git repository:
       - `{added}`                     - File has been marked for addition in cache
       - `{renamed}`                   - File has been renamed to this name in the cache
   * Merge status is show:
-      - `{unmeged, both added}`       - File was added by merge, and we added it as well.
+      - `{unmerged, both added}`      - File was added by merge, and we added it as well.
 
 Directories within a git repository:
 
