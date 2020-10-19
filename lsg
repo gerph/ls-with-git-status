@@ -602,6 +602,9 @@ for spec in "${ls_dirs[@]}" ; do
             while IFS= read -r line ; do
                 name="${line:3:${#line}}"
                 name="${name%/}"
+                if [[ "$name" == '' ]] ; then
+                    name='.'
+                fi
                 git_status[$name]="$line"
             done < <(cd "$specdir" && \
                         git status --porcelain --ignored . 2> /dev/null \
