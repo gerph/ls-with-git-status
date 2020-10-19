@@ -360,18 +360,18 @@ function git_line_changes() {
     local dir="$1"
     local name="$2"
     local where="$3"
-    local arg=''
+    local arg=()
     local result=''
     local diff_line added_lines deleted_lines total_lines
     local oldmode newmode changemode
     local delflags addflags flags
     if [[ "$where" == "cache" ]] ; then
-        arg="--cached"
+        arg=("--cached")
     elif [[ "$where" == "tree" ]] ; then
-        arg=""
+        arg=()
     fi
 
-    diff_line="$(cd "$dir" && git diff $arg --summary --numstat "$name" | expand)"
+    diff_line="$(cd "$dir" && git diff "${arg[@]}" --summary --numstat "$name" | expand)"
     if [[ "$diff_line" =~ ^([0-9]+)\ +([0-9]+) ]] ; then
         added_lines="${BASH_REMATCH[1]}"
         deleted_lines="${BASH_REMATCH[2]}"
@@ -494,12 +494,12 @@ function git_submodule_state_int() {
 
     # Try to decide if we've gone forward or back (or possibly moved to
     # a completely different tree.
-    change="$(git log --format=%H $oldsha..$newsha 2> /dev/null | wc -l)"
+    change="$(git log --format=%H "$oldsha..$newsha" 2> /dev/null | wc -l)"
     if [[ "$change" -ne 0 ]] ; then
         echo "$(( change + 0 )) forward"
         return
     fi
-    change="$(git log --format=%H $newsha..$oldsha 2> /dev/null | wc -l)"
+    change="$(git log --format=%H "$newsha..$oldsha" 2> /dev/null | wc -l)"
     if [[ "$change" -ne 0 ]] ; then
         echo "$(( change + 0 )) back"
         return
@@ -815,16 +815,16 @@ for spec in "${ls_dirs[@]}" ; do
                   "$lsg_nest" != '' && \
                   "$name" != '.' && "$name" != '..' ]] ; then
                 if [[ "$lsg_nest" == 'true' ]] ; then
-                    next_nest=(--nest)
+                    next_nest_args=(--nest)
                 else
                     next_nest=$(( lsg_nest - 1 ))
                     if [[ "$next_nest" -le 0 ]] ; then
-                        next_nest=(--no-nest)
+                        next_nest_args=(--no-nest)
                     else
-                        next_nest=(--nest=$next_nest)
+                        next_nest_args=(--nest="$next_nest")
                     fi
                 fi
-                "$0" "${next_nest[@]}" "${ls_switches[@]}" "$specdir/$name"| sed 's/^/  /'
+                "$0" "${next_nest_args[@]}" "${ls_switches[@]}" "$specdir/$name"| sed 's/^/  /'
             fi
           done
 
@@ -834,4 +834,4 @@ for spec in "${ls_dirs[@]}" ; do
     fi
 done
 
-exit $final_rc
+exit "$final_rc"
