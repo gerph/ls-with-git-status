@@ -64,6 +64,13 @@
 #       {1 modified}        - 1 file has been changed in the working tree
 #       {2 staged}          - 2 files have been changed and staged in the working tree
 #   * All the above options can be combined.
+#
+# Environment variables::
+#
+#   * LSG_COMMAND       - The command to call (defaults to 'ls'); use 'gls' on Mac OS
+#                         to force the GNU version.
+#   * LSG_OPTIONS       - Default options to supply to the 'ls' command, eg '-l' would
+#                         force the listing to always be long.
 
 # Note: The above messages are help text.
 #
@@ -80,7 +87,7 @@
 
 # The command we'll actually run for listing.
 # Replacing this with 'gls' on MacOS with GNU coreutils will run the gnu version instead.
-ls='ls'
+ls=${LSG_COMMAND:-ls}
 
 # Note: Decide what to do about GNU options for escaping (-b, -N, -q)
 #       These won't appear often in filenames, but we're trying to be all
@@ -96,7 +103,7 @@ function warning() {
 # Our custom switches
 lsg_nest=${LSG_NEST:-}
 
-ls_switches=()
+ls_switches=(${LSG_OPTIONS:-})
 special=
 warned=false
 # Track the switches we pass to ls in ls_switches

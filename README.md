@@ -109,3 +109,9 @@ Towards the top of the code, there are a number of constant symbols
 assigned which define the symbols used to show some states. Only the
 branch state and relative position in the git history use symbols;
 otherwise words are used to describe the status.
+
+Environment variables can be used to control the invocation of the
+tool:
+
+* `LSG_COMMAND`       - The command to call (defaults to `ls`); use `gls` on Mac OS to force the GNU version.
+* `LSG_OPTIONS`       - Default options to supply to the `ls` command, eg `-l` would force the listing to always be long.
